@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CleanLocal — private, local mac cleanup</title>
+    <meta
+      name="description"
+      content="CleanLocal: private, local mac cleanup. no background drama. Monitor system health, remove junk safely, and reclaim space without scare tactics."
+    />
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(16, 24, 48, 0.7);
+        --panel-solid: #121a33;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #eef2ff;
+        --muted: #bcc5e6;
+        --accent: #7c9cff;
+        --accent-2: #4ee3c1;
+        --shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+        --radius: 24px;
+        --max: 1080px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(124, 156, 255, 0.2), transparent 32%),
+          radial-gradient(circle at top right, rgba(78, 227, 193, 0.14), transparent 24%),
+          linear-gradient(180deg, #09101e 0%, #0b1020 55%, #0e1529 100%);
+      }
+
+      a { color: inherit; text-decoration: none; }
+
+      .container {
+        width: min(calc(100% - 32px), var(--max));
+        margin: 0 auto;
+      }
+
+      .nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 22px 0;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #08101f;
+        font-weight: 900;
+        box-shadow: var(--shadow);
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 20px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 32px;
+        align-items: center;
+        padding: 48px 0 40px;
+      }
+
+      .eyebrow,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: #dbe4ff;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+
+      h1 {
+        margin: 18px 0 14px;
+        font-size: clamp(42px, 7vw, 72px);
+        line-height: 0.94;
+        letter-spacing: -0.05em;
+        max-width: 10ch;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 19px;
+        line-height: 1.72;
+        max-width: 60ch;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        font-weight: 600;
+        transition: 160ms ease;
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, var(--accent), #94a9ff);
+        color: #08101f;
+      }
+
+      .button.secondary {
+        border-color: var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+      }
+
+      .button:hover { transform: translateY(-1px); }
+
+      .hero-card,
+      .card,
+      .steps,
+      .footer-card {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(16px);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-card {
+        border-radius: 28px;
+        padding: 24px;
+      }
+
+      .score {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .score-ring {
+        width: 104px;
+        height: 104px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: conic-gradient(var(--accent-2) 0 74%, rgba(255,255,255,0.08) 74% 100%);
+        position: relative;
+      }
+
+      .score-ring::after {
+        content: "";
+        position: absolute;
+        inset: 12px;
+        background: var(--panel-solid);
+        border-radius: 50%;
+      }
+
+      .score-ring strong {
+        position: relative;
+        z-index: 1;
+        font-size: 28px;
+      }
+
+      .mini-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .mini-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .mini-item small,
+      .muted {
+        color: var(--muted);
+      }
+
+      section {
+        padding: 36px 0;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 22px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 44px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+
+      .section-head p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 52ch;
+        line-height: 1.7;
+      }
+
+      .grid-3,
+      .grid-2 {
+        display: grid;
+        gap: 18px;
+      }
+
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      .card {
+        border-radius: 22px;
+        padding: 22px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 20px;
+        letter-spacing: -0.03em;
+      }
+
+      .card p,
+      .card li,
+      .steps p,
+      .footer-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.75;
+        font-size: 15px;
+      }
+
+      .card ul {
+        margin: 16px 0 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .steps {
+        border-radius: 28px;
+        padding: 26px;
+      }
+
+      .steps-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 20px;
+      }
+
+      .step-number {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: rgba(124, 156, 255, 0.16);
+        color: #dfe6ff;
+        margin-bottom: 14px;
+        font-weight: 700;
+      }
+
+      .quote {
+        border-left: 3px solid rgba(124, 156, 255, 0.5);
+        padding-left: 14px;
+        margin-top: 16px;
+        color: #d8e1ff;
+      }
+
+      pre {
+        margin: 18px 0 0;
+        padding: 16px;
+        border-radius: 18px;
+        overflow-x: auto;
+        background: #09101c;
+        border: 1px solid rgba(255,255,255,0.06);
+        color: #dff6f0;
+        font-size: 14px;
+      }
+
+      .footer-card {
+        border-radius: 28px;
+        padding: 28px;
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: center;
+      }
+
+      footer {
+        padding: 24px 0 48px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid-3,
+        .grid-2,
+        .steps-grid,
+        .footer-card {
+          grid-template-columns: 1fr;
+          display: grid;
+        }
+
+        .section-head,
+        .footer-card {
+          align-items: start;
+        }
+
+        .nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .nav-links {
+          flex-wrap: wrap;
+        }
+      }
+
+      @media (max-width: 640px) {
+        h1 { max-width: unset; }
+        .hero { padding-top: 24px; }
+        .hero-card,
+        .card,
+        .steps,
+        .footer-card { padding: 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="nav">
+        <a class="brand" href="#top">
+          <span class="brand-mark">C</span>
+          <span>CleanLocal</span>
+        </a>
+        <nav class="nav-links">
+          <a href="#features">features</a>
+          <a href="#how">how it works</a>
+          <a href="#safety">safety</a>
+          <a href="#run">run locally</a>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero">
+          <div>
+            <span class="eyebrow">private, local mac cleanup. no background drama.</span>
+            <h1>clean your mac without the scare tactics.</h1>
+            <p>
+              CleanLocal helps you monitor system health, spot junk, uninstall unused apps, and reclaim space safely.
+              It stays practical: menu bar visibility, clear actions, and trash-first cleanup instead of dramatic fake danger alerts.
+            </p>
+            <div class="hero-actions">
+              <a class="button primary" href="#run">run locally</a>
+              <a class="button secondary" href="#features">see features</a>
+            </div>
+          </div>
+
+          <aside class="hero-card" aria-label="App preview">
+            <div class="score">
+              <div>
+                <span class="pill">live menu bar health score</span>
+                <h3 style="margin: 14px 0 6px; font-size: 28px; letter-spacing: -0.03em;">one quick view, less mac chaos</h3>
+                <p class="muted">cpu, memory, disk, network, and zombie-process penalties rolled into one glanceable score.</p>
+              </div>
+              <div class="score-ring"><strong>74</strong></div>
+            </div>
+            <div class="mini-list">
+              <div class="mini-item">
+                <div>
+                  <strong>quick clean</strong>
+                  <div><small>common developer and system caches</small></div>
+                </div>
+                <strong>8.6 GB</strong>
+              </div>
+              <div class="mini-item">
+                <div>
+                  <strong>apps tab</strong>
+                  <div><small>size + last used date across /Applications</small></div>
+                </div>
+                <strong>12 apps</strong>
+              </div>
+              <div class="mini-item">
+                <div>
+                  <strong>cleanup tab</strong>
+                  <div><small>high cpu, memory hogs, disk junk</small></div>
+                </div>
+                <strong>3 actions</strong>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section id="features">
+          <div class="section-head">
+            <div>
+              <span class="pill">what it does</span>
+              <h2>the useful parts, not the bloated theatre.</h2>
+            </div>
+            <p>
+              This page is grounded directly in the MiniGuard README, so the promise matches the app instead of marketing fan fiction.
+            </p>
+          </div>
+
+          <div class="grid-3">
+            <article class="card">
+              <h3>monitor</h3>
+              <p>Track live cpu, memory, disk, and network health from the menu bar. Then use Quick Clean for the obvious junk first.</p>
+              <ul>
+                <li>live system stats</li>
+                <li>health score at a glance</li>
+                <li>quick clean for common caches</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>apps</h3>
+              <p>Scan <code>/Applications</code>, estimate app size, check last-used date, and uninstall selected apps with a warning when sudo is needed.</p>
+              <ul>
+                <li>estimated app sizes</li>
+                <li>last used visibility</li>
+                <li>selective uninstall flow</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>cleanup</h3>
+              <p>Find high cpu processes, memory hogs, and disk junk. Clean only what you check. No mystery cleanup button bullshit.</p>
+              <ul>
+                <li>kill high cpu processes</li>
+                <li>memory purge action</li>
+                <li>selective disk cleanup</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="how">
+          <div class="steps">
+            <span class="pill">how it works</span>
+            <h2 style="margin-top: 14px;">three simple steps.</h2>
+            <p>CleanLocal keeps the workflow boring on purpose. Boring is good when files are involved.</p>
+            <div class="steps-grid">
+              <div>
+                <div class="step-number">1</div>
+                <h3 style="margin: 0 0 8px;">scan what matters</h3>
+                <p>Read live health data, app usage clues, and common junk locations to see what is actually worth touching.</p>
+              </div>
+              <div>
+                <div class="step-number">2</div>
+                <h3 style="margin: 0 0 8px;">review before cleaning</h3>
+                <p>Select the specific items you want to clean, uninstall, purge, or kill. The point is visibility, not magic.</p>
+              </div>
+              <div>
+                <div class="step-number">3</div>
+                <h3 style="margin: 0 0 8px;">clean safely</h3>
+                <p>Many cleanup actions go to <code>~/.Trash</code> first, which is a lot less terrifying than a giant hidden delete button.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="safety">
+          <div class="section-head">
+            <div>
+              <span class="pill">safety</span>
+              <h2>safer by default.</h2>
+            </div>
+            <p>
+              The README is clear about two things: several actions use trash-first cleanup, and root-owned app removal may still need sudo.
+            </p>
+          </div>
+
+          <div class="grid-2">
+            <article class="card">
+              <h3>what makes it feel honest</h3>
+              <ul>
+                <li>trash-first cleanup where possible</li>
+                <li>selective cleanup, only checked items</li>
+                <li>sudo warning when elevated permissions are required</li>
+                <li>github release check instead of weird silent auto-installs</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>what it does not pretend to be</h3>
+              <ul>
+                <li>not a fake “your mac is dying” dashboard</li>
+                <li>not a black-box optimizer</li>
+                <li>not a background drama machine</li>
+                <li>not an auto-delete roulette wheel</li>
+              </ul>
+              <p class="quote">clean your mac, sure. just don’t make the app itself feel like malware with better branding.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="run">
+          <div class="section-head">
+            <div>
+              <span class="pill">run locally</span>
+              <h2>dead simple setup.</h2>
+            </div>
+            <p>MiniGuard currently ships as a Swift macOS app, so the easiest CTA is just: clone it and run it.</p>
+          </div>
+
+          <div class="card">
+            <p>Requirements: macOS 13+, Xcode Command Line Tools or full Xcode, Swift 5.7+.</p>
+            <pre>cd ~/Documents/MiniGuard
+swift build
+swift run</pre>
+          </div>
+        </section>
+
+        <section>
+          <div class="footer-card">
+            <div>
+              <span class="pill">cleanlocal</span>
+              <h2 style="margin-top: 14px;">private, local mac cleanup. no background drama.</h2>
+              <p>Simple landing page, grounded in the actual app, ready for you to refine later if the product direction hardens.</p>
+            </div>
+            <div class="hero-actions" style="margin-top: 0;">
+              <a class="button primary" href="#run">run locally</a>
+              <a class="button secondary" href="https://github.com/dickyudhandika/MiniGuard" target="_blank" rel="noreferrer">view repo</a>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        built from MiniGuard README details: monitor tab, apps tab, cleanup tab, onboarding, release checks, and trash-first safety notes.
+      </footer>
+    </div>
+  </body>
+</html>
