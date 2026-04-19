@@ -38,13 +38,13 @@ swift run
 
 ## Build distributable .app bundle
 
-CleanLocal is a SwiftPM app project. Current executable target name is still `MiniGuard`, so `swift build` does not auto-generate a `.app` bundle. Use this:
+CleanLocal is a SwiftPM app project. Current executable target name is still `CleanLocal`, so `swift build` does not auto-generate a `.app` bundle. Use this:
 
 ```bash
 cd ~/Documents/CleanLocal
 swift build -c release
 
-APP_NAME="MiniGuard"
+APP_NAME="CleanLocal"
 APP_VERSION="0.1.0"
 APP_BUNDLE="dist/${APP_NAME}.app"
 BIN_PATH=".build/arm64-apple-macosx/release/${APP_NAME}"
@@ -60,17 +60,17 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>MiniGuard</string>
+  <string>CleanLocal</string>
   <key>CFBundleDisplayName</key>
-  <string>MiniGuard</string>
+  <string>CleanLocal</string>
   <key>CFBundleIdentifier</key>
-  <string>com.dickyudhandika.miniguard</string>
+  <string>com.dickyudhandika.cleanlocal</string>
   <key>CFBundleVersion</key>
   <string>0.1.0</string>
   <key>CFBundleShortVersionString</key>
   <string>0.1.0</string>
   <key>CFBundleExecutable</key>
-  <string>MiniGuard</string>
+  <string>CleanLocal</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>LSMinimumSystemVersion</key>
@@ -83,8 +83,8 @@ ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "dist/${APP_NAME}-macOS-v
 ```
 
 Output:
-- `dist/MiniGuard.app`
-- `dist/MiniGuard-macOS-v0.1.0.zip`
+- `dist/CleanLocal.app`
+- `dist/CleanLocal-macOS-v0.1.0.zip`
 
 ### Publish to GitHub Releases
 
@@ -96,7 +96,7 @@ gh auth login -w -s repo
 gh auth status
 
 VERSION="v0.1.0"
-ZIP="dist/MiniGuard-macOS-${VERSION}.zip"
+ZIP="dist/CleanLocal-macOS-${VERSION}.zip"
 
 # tag + push
 git tag "$VERSION"
@@ -106,20 +106,20 @@ git push origin "$VERSION"
 gh release create "$VERSION" "$ZIP" \
   --repo dickyudhandika/CleanLocal \
   --title "CleanLocal ${VERSION}" \
-  --notes "macOS build for CleanLocal. Download the zip, extract, and move MiniGuard.app to /Applications."
+  --notes "macOS build for CleanLocal. Download the zip, extract, and move CleanLocal.app to /Applications."
 ```
 
 If you need to replace a bad asset:
 
 ```bash
-gh release delete-asset v0.1.0 MiniGuard-macOS-v0.1.0.zip -R dickyudhandika/CleanLocal -y
-gh release upload v0.1.0 dist/MiniGuard-macOS-v0.1.0.zip -R dickyudhandika/CleanLocal --clobber
+gh release delete-asset v0.1.0 CleanLocal-macOS-v0.1.0.zip -R dickyudhandika/CleanLocal -y
+gh release upload v0.1.0 dist/CleanLocal-macOS-v0.1.0.zip -R dickyudhandika/CleanLocal --clobber
 ```
 
 ## Project structure
 
 - `Package.swift` — Swift Package definition
-- `Sources/MiniGuard.swift` — main app code (status item, UI, monitor, cleanup, updater)
+- `Sources/CleanLocal.swift` — main app code (status item, UI, monitor, cleanup, updater)
 
 ## Update feature details
 
@@ -139,7 +139,7 @@ Note: this is a release-link updater, not in-app auto-install.
 ## Onboarding reset (for testing)
 
 ```bash
-defaults delete miniguard miniguard.hasSeenOnboarding
+defaults delete cleanlocal cleanlocal.hasSeenOnboarding
 ```
 
 ## Troubleshooting
@@ -150,7 +150,7 @@ defaults delete miniguard miniguard.hasSeenOnboarding
 - If multiple app instances are running from repeated `swift run`:
 
 ```bash
-pkill -f '/Users/thenom4design/Documents/CleanLocal/.build/arm64-apple-macosx/debug/MiniGuard'
+pkill -f '/Users/thenom4design/Documents/CleanLocal/.build/arm64-apple-macosx/debug/CleanLocal'
 ```
 
 ## Safety notes

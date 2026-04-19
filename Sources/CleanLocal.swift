@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct MiniGuardApp: App {
+struct CleanLocalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -20,7 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 // MARK: - Models
-enum MiniGuardTab: String, CaseIterable, Identifiable {
+enum CleanLocalTab: String, CaseIterable, Identifiable {
     case monitor = "Monitor"
     case apps = "Apps"
     case cleanup = "Cleanup"
@@ -180,7 +180,7 @@ class SystemMonitor: ObservableObject {
     @Published var lastCleaned: String = "Never"
     @Published var cleanupLog: [String] = []
 
-    @Published var selectedTab: MiniGuardTab = .monitor
+    @Published var selectedTab: CleanLocalTab = .monitor
 
     // Apps tab
     @Published var installedApps: [InstalledApp] = []
@@ -204,7 +204,7 @@ class SystemMonitor: ObservableObject {
     @Published var lastUpdateCheckedAt: Date? = nil
 
     // GitHub repo for releases: owner/repo
-    private let updateRepo = "dickyudhandika/MiniGuard"
+    private let updateRepo = "dickyudhandika/CleanLocal"
 
     func refresh() {
         updateCPU()
@@ -387,20 +387,20 @@ class SystemMonitor: ObservableObject {
             let script = """
             echo "1/6 Nuking npm cache..."
             npm cache clean --force 2>/dev/null
-            mv ~/.npm/_cacache ~/.Trash/miniguard-npm-cacache-$(date +%s) 2>/dev/null
-            mv ~/.npm/_logs ~/.Trash/miniguard-npm-logs-$(date +%s) 2>/dev/null
+            mv ~/.npm/_cacache ~/.Trash/cleanlocal-npm-cacache-$(date +%s) 2>/dev/null
+            mv ~/.npm/_logs ~/.Trash/cleanlocal-npm-logs-$(date +%s) 2>/dev/null
 
             echo "2/6 Wiping Homebrew cache..."
-            mv ~/Library/Caches/Homebrew ~/.Trash/miniguard-homebrew-cache-$(date +%s) 2>/dev/null
+            mv ~/Library/Caches/Homebrew ~/.Trash/cleanlocal-homebrew-cache-$(date +%s) 2>/dev/null
 
             echo "3/6 Clearing Hermes sessions..."
-            mv ~/.hermes/sessions ~/.Trash/miniguard-hermes-sessions-$(date +%s) 2>/dev/null
-            mv ~/.hermes/logs ~/.Trash/miniguard-hermes-logs-$(date +%s) 2>/dev/null
-            mv ~/.hermes/.cache ~/.Trash/miniguard-hermes-cache-$(date +%s) 2>/dev/null
-            mv ~/.hermes/tools-cache ~/.Trash/miniguard-hermes-tools-cache-$(date +%s) 2>/dev/null
+            mv ~/.hermes/sessions ~/.Trash/cleanlocal-hermes-sessions-$(date +%s) 2>/dev/null
+            mv ~/.hermes/logs ~/.Trash/cleanlocal-hermes-logs-$(date +%s) 2>/dev/null
+            mv ~/.hermes/.cache ~/.Trash/cleanlocal-hermes-cache-$(date +%s) 2>/dev/null
+            mv ~/.hermes/tools-cache ~/.Trash/cleanlocal-hermes-tools-cache-$(date +%s) 2>/dev/null
 
             echo "4/6 Purging pip cache..."
-            mv ~/Library/Caches/pip ~/.Trash/miniguard-pip-cache-$(date +%s) 2>/dev/null
+            mv ~/Library/Caches/pip ~/.Trash/cleanlocal-pip-cache-$(date +%s) 2>/dev/null
 
             echo "5/6 Killing zombie python3.11..."
             pids=$(ps aux | grep python3.11 | grep -v grep | awk '{print $2}')
@@ -521,7 +521,7 @@ class SystemMonitor: ObservableObject {
                 _ = self.shell("killall \(self.sh(app.name)) 2>/dev/null")
                 _ = self.shell("osascript -e 'tell application \"System Events\" to delete login item \"\(self.escapeAppleScript(app.name))\"' 2>/dev/null")
 
-                let appTarget = "~/.Trash/miniguard-\(self.slug(app.name))-app-$(date +%s).app"
+                let appTarget = "~/.Trash/cleanlocal-\(self.slug(app.name))-app-$(date +%s).app"
                 let moveOutput = self.shell("mv \(self.sh(app.path)) \(appTarget) 2>&1")
 
                 if moveOutput.lowercased().contains("operation not permitted") || moveOutput.lowercased().contains("permission denied") || app.needsSudo {
@@ -539,7 +539,7 @@ class SystemMonitor: ObservableObject {
                 ]
 
                 for pattern in leftovers {
-                    _ = self.shell("for p in \(pattern); do [ -e \"$p\" ] && mv \"$p\" ~/.Trash/miniguard-\(self.slug(app.name))-$(basename \"$p\")-$(date +%s) 2>/dev/null; done")
+                    _ = self.shell("for p in \(pattern); do [ -e \"$p\" ] && mv \"$p\" ~/.Trash/cleanlocal-\(self.slug(app.name))-$(basename \"$p\")-$(date +%s) 2>/dev/null; done")
                 }
 
                 logs.append(String(format: "estimated reclaimed: %.2f GB", app.sizeGB))
@@ -597,7 +597,7 @@ class SystemMonitor: ObservableObject {
             let command = parts[10...].joined(separator: " ")
 
             guard cpu >= 20 else { continue }
-            guard !command.contains("MiniGuard") else { continue }
+            guard !command.contains("CleanLocal") else { continue }
             guard !command.contains("kernel_task") else { continue }
 
             items.append(
@@ -633,7 +633,7 @@ class SystemMonitor: ObservableObject {
             let command = parts[10...].joined(separator: " ")
 
             guard memPercent >= 2 else { continue }
-            guard !command.contains("MiniGuard") else { continue }
+            guard !command.contains("CleanLocal") else { continue }
 
             items.append(
                 ProcessItem(
@@ -720,10 +720,10 @@ class SystemMonitor: ObservableObject {
 
             for item in selected {
                 let basename = (item.path as NSString).lastPathComponent
-                let target = "~/.Trash/miniguard-\(self.slug(basename))-$(date +%s)"
+                let target = "~/.Trash/cleanlocal-\(self.slug(basename))-$(date +%s)"
 
                 if item.path == "~/.Trash" {
-                    let out = self.shell("find ~/.Trash -mindepth 1 -maxdepth 1 -exec mv {} ~/.Trash/miniguard-trash-clean-$(date +%s)-$(basename {}) \\; 2>/dev/null")
+                    let out = self.shell("find ~/.Trash -mindepth 1 -maxdepth 1 -exec mv {} ~/.Trash/cleanlocal-trash-clean-$(date +%s)-$(basename {}) \\; 2>/dev/null")
                     logs.append(out.isEmpty ? "cleaned Trash items" : out)
                 } else {
                     let out = self.shell("mv \(self.sh(item.path)) \(target) 2>&1")
@@ -786,7 +786,7 @@ class SystemMonitor: ObservableObject {
         }
 
         var request = URLRequest(url: url)
-        request.setValue("MiniGuard", forHTTPHeaderField: "User-Agent")
+        request.setValue("CleanLocal", forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -944,7 +944,7 @@ class SystemMonitor: ObservableObject {
 // MARK: - Popover View
 struct PopoverView: View {
     @ObservedObject var monitor: SystemMonitor
-    @AppStorage("miniguard.hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
+    @AppStorage("cleanlocal.hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
     @State private var showOnboarding: Bool = false
     @State private var isWalkthroughRunning: Bool = false
     @State private var walkthroughMessage: String? = nil
@@ -955,7 +955,7 @@ struct PopoverView: View {
             Divider()
 
             Picker("Tab", selection: $monitor.selectedTab) {
-                ForEach(MiniGuardTab.allCases) { tab in
+                ForEach(CleanLocalTab.allCases) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
             }
@@ -1011,7 +1011,7 @@ struct PopoverView: View {
 
     private var header: some View {
         HStack {
-            Text("MiniGuard")
+            Text("CleanLocal")
                 .font(.system(size: 16, weight: .bold))
             Spacer()
             Button(action: { showOnboarding = true }) {
@@ -1019,7 +1019,7 @@ struct PopoverView: View {
                     .font(.system(size: 14, weight: .semibold))
             }
             .buttonStyle(.plain)
-            .help("What can MiniGuard do?")
+            .help("What can CleanLocal do?")
             healthBadge
         }
         .padding(.horizontal, 16)
@@ -1035,7 +1035,7 @@ struct PopoverView: View {
         }
     }
 
-    private func walkthroughChip(_ tab: MiniGuardTab, label: String) -> some View {
+    private func walkthroughChip(_ tab: CleanLocalTab, label: String) -> some View {
         let isActive = monitor.selectedTab == tab
 
         return Text(label)
@@ -1052,7 +1052,7 @@ struct PopoverView: View {
 
     private var onboardingSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Welcome to MiniGuard")
+            Text("Welcome to CleanLocal")
                 .font(.system(size: 18, weight: .bold))
 
             Text("Quick way to keep your Mac fast without hunting settings.")

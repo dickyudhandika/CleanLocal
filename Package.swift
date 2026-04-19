@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "MiniGuard",
+    name: "CleanLocal",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "MiniGuard", targets: ["MiniGuard"])
+        .executable(name: "CleanLocal", targets: ["CleanLocal"])
     ],
     targets: [
         .executableTarget(
-            name: "MiniGuard",
+            name: "CleanLocal",
             path: "Sources"
         )
     ]

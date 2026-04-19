@@ -1,7 +1,7 @@
-# MiniGuard — Smart Cleanup Feature
+# CleanLocal — Smart Cleanup Feature
 
 ## The Pitch
-MiniGuard becomes the "you probably don't need that anymore" app. It watches what you don't use, finds junk you forgot about, and cleans it — all from your menu bar.
+CleanLocal becomes the "you probably don't need that anymore" app. It watches what you don't use, finds junk you forgot about, and cleans it — all from your menu bar.
 
 ---
 
@@ -15,7 +15,7 @@ Scan apps you haven't opened in a week (or more). Show them. Let you decide.
 - Shows: app name, size, last opened date
 - Sorted by "least recently used" first
 - Default filter: apps not opened in 7+ days
-- User picks what to trash → MiniGuard handles everything
+- User picks what to trash → CleanLocal handles everything
 
 ### UI
 - Section: **"Apps"**
@@ -165,7 +165,7 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
 
 ```json
 {
-  "protectedApps": ["Bitdefender", "MiniGuard", "Raycast"],
+  "protectedApps": ["Bitdefender", "CleanLocal", "Raycast"],
   "cleanupPreferences": {
     "autoCleanCaches": false,
     "downloadAgeThreshold": 14,
@@ -188,7 +188,7 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
 - All destructive ops: `mv ~/.Trash/` (never `rm -rf`)
 - Everything async via `Process()` (existing pattern)
 - Popover stays 320px wide, scrollable
-- Local config at `~/.miniguard/config.json` for preferences + whitelist
+- Local config at `~/.cleanlocal/config.json` for preferences + whitelist
 - No telemetry, no network calls — everything stays local
 
 ## Key Design Decisions
