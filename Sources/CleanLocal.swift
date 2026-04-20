@@ -73,6 +73,79 @@ struct GitHubRelease: Decodable {
     }
 }
 
+enum QuickCleanPhase: String, CaseIterable, Codable {
+    case publicSafe = "Public Safe"
+    case leftovers = "App Leftovers"
+    case developer = "Developer"
+    case riskyReview = "Risky Review"
+}
+
+enum QuickCleanRisk: String, Codable {
+    case auto
+    case reviewOnly
+}
+
+enum QuickCleanExecuteType: String, Codable {
+    case movePathToTrash
+    case command
+    case suggestionOnly
+}
+
+struct QuickCleanItem: Identifiable, Codable {
+    let id: UUID
+    let phase: QuickCleanPhase
+    let title: String
+    let pathOrCommand: String
+    let estimatedGB: Double
+    let risk: QuickCleanRisk
+    let reason: String
+    let executeType: QuickCleanExecuteType
+
+    init(
+        id: UUID = UUID(),
+        phase: QuickCleanPhase,
+        title: String,
+        pathOrCommand: String,
+        estimatedGB: Double,
+        risk: QuickCleanRisk,
+        reason: String,
+        executeType: QuickCleanExecuteType
+    ) {
+        self.id = id
+        self.phase = phase
+        self.title = title
+        self.pathOrCommand = pathOrCommand
+        self.estimatedGB = estimatedGB
+        self.risk = risk
+        self.reason = reason
+        self.executeType = executeType
+    }
+}
+
+struct QuickCleanRunSummary {
+    var reclaimedGB: Double = 0
+    var executedCount: Int = 0
+    var skipped: [String] = []
+    var suggestions: [String] = []
+    var logs: [String] = []
+}
+
+struct QuickCleanPolicy {
+    static let phaseOrder: [QuickCleanPhase] = [.publicSafe, .leftovers, .developer, .riskyReview]
+
+    static func shouldAutoExecute(_ item: QuickCleanItem) -> Bool {
+        item.risk == .auto && item.phase != .riskyReview
+    }
+
+    static func isForbiddenQuickCleanPath(_ path: String) -> Bool {
+        path.localizedCaseInsensitiveContains("/.hermes") || path.localizedCaseInsensitiveContains("~/.hermes")
+    }
+
+    static func isDeveloperPhaseEnabled(devSignals: [String]) -> Bool {
+        !devSignals.isEmpty
+    }
+}
+
 // MARK: - Status Bar Controller
 class StatusBarController: ObservableObject {
     private var statusItem: NSStatusItem!
@@ -179,6 +252,8 @@ class SystemMonitor: ObservableObject {
     @Published var isCleaning: Bool = false
     @Published var lastCleaned: String = "Never"
     @Published var cleanupLog: [String] = []
+    @Published var lastQuickCleanReclaimedGB: Double = 0
+    @Published var quickCleanSuggestionCount: Int = 0
 
     @Published var selectedTab: CleanLocalTab = .monitor
 
@@ -344,7 +419,7 @@ class SystemMonitor: ObservableObject {
     private func updateCleanableCache() {
         let output = shell("""
             total=0
-            for dir in ~/.npm/_cacache ~/Library/Caches/Homebrew ~/.hermes/sessions ~/.hermes/logs ~/Library/Caches/pip; do
+            for dir in ~/Library/Caches ~/.npm/_cacache ~/Library/Caches/Homebrew ~/Library/Caches/pip ~/.cache/pip; do
                 size=$(du -sk "$dir" 2>/dev/null | awk '{print $1}')
                 size=${size:-0}
                 total=$((total + size))
@@ -380,54 +455,390 @@ class SystemMonitor: ObservableObject {
 
         DispatchQueue.main.async {
             self.isCleaning = true
-            self.cleanupLog = []
+            self.cleanupLog = ["Planning phased quick clean..."]
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let script = """
-            echo "1/6 Nuking npm cache..."
-            npm cache clean --force 2>/dev/null
-            mv ~/.npm/_cacache ~/.Trash/cleanlocal-npm-cacache-$(date +%s) 2>/dev/null
-            mv ~/.npm/_logs ~/.Trash/cleanlocal-npm-logs-$(date +%s) 2>/dev/null
-
-            echo "2/6 Wiping Homebrew cache..."
-            mv ~/Library/Caches/Homebrew ~/.Trash/cleanlocal-homebrew-cache-$(date +%s) 2>/dev/null
-
-            echo "3/6 Clearing Hermes sessions..."
-            mv ~/.hermes/sessions ~/.Trash/cleanlocal-hermes-sessions-$(date +%s) 2>/dev/null
-            mv ~/.hermes/logs ~/.Trash/cleanlocal-hermes-logs-$(date +%s) 2>/dev/null
-            mv ~/.hermes/.cache ~/.Trash/cleanlocal-hermes-cache-$(date +%s) 2>/dev/null
-            mv ~/.hermes/tools-cache ~/.Trash/cleanlocal-hermes-tools-cache-$(date +%s) 2>/dev/null
-
-            echo "4/6 Purging pip cache..."
-            mv ~/Library/Caches/pip ~/.Trash/cleanlocal-pip-cache-$(date +%s) 2>/dev/null
-
-            echo "5/6 Killing zombie python3.11..."
-            pids=$(ps aux | grep python3.11 | grep -v grep | awk '{print $2}')
-            if [ -n "$pids" ]; then
-              echo "$pids" | xargs kill -9 2>/dev/null
-              echo "Zombies: zapped"
-            else
-              echo "Zombies: none found"
-            fi
-
-            echo "6/6 Flushing DNS..."
-            dscacheutil -flushcache 2>/dev/null
-            killall -HUP mDNSResponder 2>/dev/null
-            """
-
-            let output = self.shell(script)
-            let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+            let plan = self.buildQuickCleanPlan()
+            let summary = self.executeQuickCleanPlan(plan)
 
             DispatchQueue.main.async {
                 self.isCleaning = false
-                self.cleanupLog = lines
+                self.cleanupLog = summary.logs
+                self.lastQuickCleanReclaimedGB = summary.reclaimedGB
+                self.quickCleanSuggestionCount = summary.suggestions.count
                 let formatter = DateFormatter()
                 formatter.dateFormat = "HH:mm"
                 self.lastCleaned = formatter.string(from: Date())
                 self.refresh()
             }
         }
+    }
+
+    func buildQuickCleanPlan() -> [QuickCleanItem] {
+        var items: [QuickCleanItem] = []
+
+        items.append(contentsOf: scanPublicSafeCaches())
+        items.append(contentsOf: scanOldDownloadsCandidates())
+        items.append(contentsOf: scanSafeTrashArtifacts())
+        items.append(contentsOf: scanOrphanedAppData())
+
+        let devSignals = detectDeveloperSignals()
+        if QuickCleanPolicy.isDeveloperPhaseEnabled(devSignals: devSignals) {
+            items.append(contentsOf: scanDeveloperCaches(devSignals: devSignals))
+        }
+
+        items.append(contentsOf: generateRiskySuggestions())
+        return items
+    }
+
+    private func executeQuickCleanPlan(_ items: [QuickCleanItem]) -> QuickCleanRunSummary {
+        var summary = QuickCleanRunSummary()
+        let grouped = Dictionary(grouping: items, by: { $0.phase })
+
+        for (index, phase) in QuickCleanPolicy.phaseOrder.enumerated() {
+            let phaseItems = grouped[phase] ?? []
+            if phaseItems.isEmpty {
+                summary.logs.append("\(index + 1)/4 \(phase.rawValue): skipped (no relevant items)")
+                continue
+            }
+
+            var phaseReclaimed = 0.0
+            var phaseExecuted = 0
+            var phaseSuggestions = 0
+
+            for item in phaseItems {
+                if QuickCleanPolicy.shouldAutoExecute(item) {
+                    if QuickCleanPolicy.isForbiddenQuickCleanPath(item.pathOrCommand) {
+                        summary.skipped.append("forbidden path blocked: \(item.pathOrCommand)")
+                        continue
+                    }
+                    if executeQuickCleanItem(item) {
+                        phaseExecuted += 1
+                        summary.executedCount += 1
+                        phaseReclaimed += item.estimatedGB
+                        summary.reclaimedGB += item.estimatedGB
+                    } else {
+                        summary.skipped.append("failed: \(item.title)")
+                    }
+                } else {
+                    phaseSuggestions += 1
+                    summary.suggestions.append(item.title)
+                }
+            }
+
+            if phase == .riskyReview {
+                summary.logs.append("\(index + 1)/4 \(phase.rawValue): \(phaseSuggestions) suggestion(s) (not executed)")
+            } else {
+                summary.logs.append("\(index + 1)/4 \(phase.rawValue): cleaned \(String(format: "%.2f", phaseReclaimed)) GB across \(phaseExecuted) item(s)")
+            }
+        }
+
+        summary.logs.append("Done. Reclaimed \(String(format: "%.2f", summary.reclaimedGB)) GB.")
+        if !summary.suggestions.isEmpty {
+            summary.logs.append("Suggestions: \(summary.suggestions.count) review action(s) in Cleanup tab.")
+        }
+
+        return summary
+    }
+
+    private func executeQuickCleanItem(_ item: QuickCleanItem) -> Bool {
+        switch item.executeType {
+        case .movePathToTrash:
+            return movePathToTrash(item.pathOrCommand)
+        case .command:
+            let result = runShell(item.pathOrCommand)
+            return result.status == 0
+        case .suggestionOnly:
+            return false
+        }
+    }
+
+    private func scanPublicSafeCaches() -> [QuickCleanItem] {
+        let output = shell("du -sk ~/Library/Caches/* 2>/dev/null | sort -rn | head -20")
+        var items: [QuickCleanItem] = []
+
+        for (kb, path) in parseDuRows(output) {
+            let sizeGB = kb / 1_048_576
+            guard sizeGB >= 0.05 else { continue }
+            guard !QuickCleanPolicy.isForbiddenQuickCleanPath(path) else { continue }
+
+            items.append(
+                QuickCleanItem(
+                    phase: .publicSafe,
+                    title: "Cache: \((path as NSString).lastPathComponent)",
+                    pathOrCommand: path,
+                    estimatedGB: sizeGB,
+                    risk: .auto,
+                    reason: "Safe user cache cleanup",
+                    executeType: .movePathToTrash
+                )
+            )
+        }
+
+        return items
+    }
+
+    private func scanOldDownloadsCandidates() -> [QuickCleanItem] {
+        let output = shell("find ~/Downloads -maxdepth 1 -type f -mtime +14 -size +20M -print0 2>/dev/null | xargs -0 du -sk 2>/dev/null | sort -rn | head -20")
+        var items: [QuickCleanItem] = []
+
+        for (kb, path) in parseDuRows(output) {
+            let sizeGB = kb / 1_048_576
+            guard sizeGB >= 0.02 else { continue }
+            items.append(
+                QuickCleanItem(
+                    phase: .publicSafe,
+                    title: "Old download: \((path as NSString).lastPathComponent)",
+                    pathOrCommand: path,
+                    estimatedGB: sizeGB,
+                    risk: .auto,
+                    reason: "Old download file over threshold",
+                    executeType: .movePathToTrash
+                )
+            )
+        }
+
+        return items
+    }
+
+    private func scanSafeTrashArtifacts() -> [QuickCleanItem] {
+        let kbRaw = shell("du -sk ~/.Trash/cleanlocal-* 2>/dev/null | awk '{total += $1} END {print total+0}'")
+        let kb = Double(kbRaw.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        guard kb > 0 else { return [] }
+
+        return [
+            QuickCleanItem(
+                phase: .publicSafe,
+                title: "Old CleanLocal artifacts in Trash",
+                pathOrCommand: "find ~/.Trash -maxdepth 1 -name 'cleanlocal-*' -exec rm -rf {} + 2>/dev/null",
+                estimatedGB: kb / 1_048_576,
+                risk: .auto,
+                reason: "Cleanup previous app-created trash artifacts only",
+                executeType: .command
+            )
+        ]
+    }
+
+    private func scanOrphanedAppData() -> [QuickCleanItem] {
+        let installed = installedAppNamesSet()
+        let output = shell("du -sk ~/Library/Application\\ Support/* 2>/dev/null | sort -rn | head -30")
+        var items: [QuickCleanItem] = []
+
+        for (kb, path) in parseDuRows(output) {
+            let base = ((path as NSString).lastPathComponent).lowercased()
+            let normalized = base.replacingOccurrences(of: " ", with: "")
+            let isInstalled = installed.contains(base) || installed.contains(normalized)
+            guard !isInstalled else { continue }
+
+            let sizeGB = kb / 1_048_576
+            guard sizeGB >= 0.10 else { continue }
+
+            items.append(
+                QuickCleanItem(
+                    phase: .leftovers,
+                    title: "Potential leftover: \((path as NSString).lastPathComponent)",
+                    pathOrCommand: path,
+                    estimatedGB: sizeGB,
+                    risk: .reviewOnly,
+                    reason: "Not detected in installed app list; review before cleanup",
+                    executeType: .suggestionOnly
+                )
+            )
+        }
+
+        return items
+    }
+
+    private func detectDeveloperSignals() -> [String] {
+        var signals: [String] = []
+
+        if commandExists("npm") || pathExists("~/.npm") { signals.append("npm") }
+        if commandExists("pip") || commandExists("pip3") || pathExists("~/Library/Caches/pip") || pathExists("~/.cache/pip") {
+            signals.append("pip")
+        }
+        if commandExists("brew") || pathExists("~/Library/Caches/Homebrew") {
+            signals.append("homebrew")
+        }
+
+        let devArtifacts = shell("find ~ -maxdepth 4 \\( -name node_modules -o -name .next -o -name __pycache__ \\) -type d 2>/dev/null | head -1")
+        if !devArtifacts.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            signals.append("dev-artifacts")
+        }
+
+        return Array(Set(signals)).sorted()
+    }
+
+    private func scanDeveloperCaches(devSignals: [String]) -> [QuickCleanItem] {
+        var items: [QuickCleanItem] = []
+
+        if devSignals.contains("npm") {
+            let npmKb = Double(shell("du -sk ~/.npm/_cacache 2>/dev/null | awk '{print $1}'").trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            items.append(
+                QuickCleanItem(
+                    phase: .developer,
+                    title: "npm cache",
+                    pathOrCommand: "npm cache clean --force >/dev/null 2>&1",
+                    estimatedGB: npmKb / 1_048_576,
+                    risk: .auto,
+                    reason: "Developer cache cleanup",
+                    executeType: .command
+                )
+            )
+            if pathExists("~/.npm/_logs") {
+                items.append(
+                    QuickCleanItem(
+                        phase: .developer,
+                        title: "npm logs",
+                        pathOrCommand: "~/.npm/_logs",
+                        estimatedGB: 0,
+                        risk: .auto,
+                        reason: "Developer logs cache",
+                        executeType: .movePathToTrash
+                    )
+                )
+            }
+        }
+
+        if devSignals.contains("pip") {
+            let pipPath = pathExists("~/Library/Caches/pip") ? "~/Library/Caches/pip" : "~/.cache/pip"
+            let pipKb = Double(shell("du -sk \(pipPath) 2>/dev/null | awk '{print $1}'").trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            items.append(
+                QuickCleanItem(
+                    phase: .developer,
+                    title: "pip cache",
+                    pathOrCommand: pipPath,
+                    estimatedGB: pipKb / 1_048_576,
+                    risk: .auto,
+                    reason: "Python package cache",
+                    executeType: .movePathToTrash
+                )
+            )
+        }
+
+        if devSignals.contains("homebrew") {
+            let hbKb = Double(shell("du -sk ~/Library/Caches/Homebrew 2>/dev/null | awk '{print $1}'").trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            items.append(
+                QuickCleanItem(
+                    phase: .developer,
+                    title: "Homebrew cache",
+                    pathOrCommand: "~/Library/Caches/Homebrew",
+                    estimatedGB: hbKb / 1_048_576,
+                    risk: .auto,
+                    reason: "Homebrew download cache",
+                    executeType: .movePathToTrash
+                )
+            )
+        }
+
+        let cliCaches = ["~/.cache/pypoetry", "~/.cache/uv", "~/.pnpm-store"]
+        for cache in cliCaches where pathExists(cache) {
+            let kb = Double(shell("du -sk \(cache) 2>/dev/null | awk '{print $1}'").trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            items.append(
+                QuickCleanItem(
+                    phase: .developer,
+                    title: "CLI cache: \((cache as NSString).lastPathComponent)",
+                    pathOrCommand: cache,
+                    estimatedGB: kb / 1_048_576,
+                    risk: .auto,
+                    reason: "Safe CLI cache cleanup",
+                    executeType: .movePathToTrash
+                )
+            )
+        }
+
+        let staleArtifacts = shell("find ~ -maxdepth 4 \\( -name node_modules -o -name .next -o -name __pycache__ \\) -type d -mtime +21 2>/dev/null | head -5")
+        for path in staleArtifacts.split(separator: "\n").map(String.init) where !path.isEmpty {
+            items.append(
+                QuickCleanItem(
+                    phase: .developer,
+                    title: "Stale dev artifact",
+                    pathOrCommand: path,
+                    estimatedGB: 0,
+                    risk: .reviewOnly,
+                    reason: "Potentially active project folder; review first",
+                    executeType: .suggestionOnly
+                )
+            )
+        }
+
+        return items
+    }
+
+    private func generateRiskySuggestions() -> [QuickCleanItem] {
+        var suggestions: [QuickCleanItem] = []
+
+        for process in scanHighCPUProcesses().prefix(3) {
+            suggestions.append(
+                QuickCleanItem(
+                    phase: .riskyReview,
+                    title: "High CPU process PID \(process.pid)",
+                    pathOrCommand: "kill -TERM \(process.pid)",
+                    estimatedGB: 0,
+                    risk: .reviewOnly,
+                    reason: "Process controls are manual-review only",
+                    executeType: .suggestionOnly
+                )
+            )
+        }
+
+        suggestions.append(
+            QuickCleanItem(
+                phase: .riskyReview,
+                title: "Memory purge",
+                pathOrCommand: "purge",
+                estimatedGB: 0,
+                risk: .reviewOnly,
+                reason: "Manual action only",
+                executeType: .suggestionOnly
+            )
+        )
+
+        return suggestions
+    }
+
+    private func parseDuRows(_ text: String) -> [(Double, String)] {
+        text
+            .split(separator: "\n")
+            .compactMap { line in
+                let s = String(line)
+                let comps = s.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
+                guard comps.count == 2 else { return nil }
+                let kb = Double(comps[0]) ?? 0
+                let path = String(comps[1])
+                return (kb, path)
+            }
+    }
+
+    private func pathExists(_ path: String) -> Bool {
+        FileManager.default.fileExists(atPath: expandPath(path))
+    }
+
+    private func movePathToTrash(_ path: String) -> Bool {
+        let source = expandPath(path)
+        guard !QuickCleanPolicy.isForbiddenQuickCleanPath(source) else { return false }
+        guard FileManager.default.fileExists(atPath: source) else { return true }
+
+        let base = (source as NSString).lastPathComponent
+        let target = "\(NSHomeDirectory())/.Trash/cleanlocal-\(slug(base))-\(Int(Date().timeIntervalSince1970))"
+        let result = runShell("mv \(sh(source)) \(sh(target)) 2>/dev/null")
+        return result.status == 0
+    }
+
+    private func installedAppNamesSet() -> Set<String> {
+        let fm = FileManager.default
+        guard let apps = try? fm.contentsOfDirectory(atPath: "/Applications") else { return [] }
+
+        let names = apps
+            .filter { $0.hasSuffix(".app") }
+            .map { $0.replacingOccurrences(of: ".app", with: "").lowercased() }
+
+        let normalized = names.map { $0.replacingOccurrences(of: " ", with: "") }
+        return Set(names + normalized)
+    }
+
+    private func commandExists(_ command: String) -> Bool {
+        runShell("command -v \(sh(command)) >/dev/null 2>&1").status == 0
     }
 
     // MARK: Apps Tab
@@ -891,7 +1302,7 @@ class SystemMonitor: ObservableObject {
     }
 
     // MARK: Helpers
-    private func shell(_ command: String) -> String {
+    private func runShell(_ command: String) -> (status: Int32, output: String) {
         let task = Process()
         task.launchPath = "/bin/bash"
         task.arguments = ["-lc", command]
@@ -904,7 +1315,22 @@ class SystemMonitor: ObservableObject {
         task.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
+        let output = String(data: data, encoding: .utf8) ?? ""
+        return (task.terminationStatus, output)
+    }
+
+    private func shell(_ command: String) -> String {
+        runShell(command).output
+    }
+
+    private func expandPath(_ path: String) -> String {
+        if path.hasPrefix("~/") {
+            return NSHomeDirectory() + "/" + path.dropFirst(2)
+        }
+        if path == "~" {
+            return NSHomeDirectory()
+        }
+        return path
     }
 
     private func parseMDLSDate(_ raw: String) -> Date? {
@@ -1167,7 +1593,10 @@ struct PopoverView: View {
                     Text("Last quick clean: \(monitor.lastCleaned)")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
-                    ForEach(monitor.cleanupLog.prefix(8), id: \.self) { line in
+                    Text("Reclaimed: \(String(format: "%.2f", monitor.lastQuickCleanReclaimedGB)) GB • Suggestions: \(monitor.quickCleanSuggestionCount)")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondary)
+                    ForEach(monitor.cleanupLog.prefix(10), id: \.self) { line in
                         Text(line)
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.green)

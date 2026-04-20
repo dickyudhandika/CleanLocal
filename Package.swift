@@ -11,6 +11,11 @@ let package = Package(
         .executableTarget(
             name: "CleanLocal",
             path: "Sources"
+        ),
+        .testTarget(
+            name: "CleanLocalTests",
+            dependencies: ["CleanLocal"],
+            path: "Tests/CleanLocalTests"
         )
     ]
 )
