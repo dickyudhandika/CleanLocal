@@ -176,6 +176,34 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
 
 ---
 
+## Feature 4: True background / menu-bar-only app
+
+### The idea
+When skwish-my-mac launches, it should behave like a real background utility:
+- lives in the macOS menu bar
+- no Dock icon
+- no normal app window required
+- opening/closing the popover should feel like show/hide, not launch/quit noise
+
+### Expected behavior
+- Launching the app shows the status item in the menu bar
+- The app does not appear in the Dock during normal use
+- The app can be "closed" back to the menu bar without quitting
+- Quit remains an explicit action from the menu bar
+
+### Likely implementation
+- Set app activation policy to accessory/agent so it behaves as a menu-bar utility
+- Add `LSUIElement` to the app bundle plist so macOS hides the Dock icon
+- Keep Settings/Preferences optional, not as a regular window scene
+- Verify update flow, alerts, and popovers still work correctly without a Dock presence
+
+### Notes / caveats
+- This is absolutely doable
+- If we hide the Dock icon, we should make sure there is still an obvious `Quit` action in the menu bar
+- Any future settings/about screen may need explicit open/focus behavior since there is no Dock app to click back to
+
+---
+
 ## Implementation Order
 
 1. **Disk Junk Finder** (biggest value, most general)
@@ -267,5 +295,39 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
   - Swift package/target/test names migrated to `SkwishMyMac`
   - source/test paths renamed to `Sources/SkwishMyMac.swift` and `Tests/SkwishMyMacTests/...`
   - docs/README/release/update-check references switched to new brand/repo
+- Published GitHub Release for rebranded app:
+  - tag: `v0.1.1`
+  - asset: `dist/skwish-my-mac-macOS-v0.1.1.zip`
+  - URL: `https://github.com/dickyudhandika/skwish-my-mac/releases/tag/v0.1.1`
+- Added drag-to-Applications DMG installer UX for real users:
+  - built `dist/skwish-my-mac-macOS-v0.1.1.dmg`
+  - DMG includes `SkwishMyMac.app` + `Applications` shortcut for drag-install flow
+  - uploaded DMG to release `v0.1.1`
+- Updated `v0.1.1` release notes with human install steps:
+  - recommended DMG flow (open DMG -> drag app to Applications)
+  - kept ZIP fallback steps
+  - included Gatekeeper first-launch fallback command:
+    - `xattr -dr com.apple.quarantine /Applications/SkwishMyMac.app`
+- Added next feature to the product plan:
+  - make skwish-my-mac a true background/menu-bar-only app
+  - hide Dock icon during normal use
+  - keep explicit Quit from the menu bar
+- Implemented menu-bar-only runtime launch policy:
+  - app now sets activation policy at launch (`.accessory` for background/menu-bar mode)
+  - added `AppLaunchPolicy` with env override `SKWISH_SHOW_DOCK=1` for dev/debug
+  - default behavior is menu-bar-only even when `LSUIElement` is missing
+- Added tests for launch policy behavior:
+  - default menu-bar-only mode
+  - `LSUIElement` true/false handling
+  - Dock override environment handling
+  - `swift test` ✅ (10 tests passing)
+- Updated packaging docs + bundle metadata for Dockless app UX:
+  - `README.md` Info.plist template now sets `LSUIElement=true`
+  - corrected `CFBundleExecutable` to `SkwishMyMac`
+  - rebuilt `dist/SkwishMyMac.app` and `dist/skwish-my-mac-macOS-v0.1.1.zip` with `LSUIElement=true`
+- Prepared new release artifacts for Dockless/menu-bar-only launch fix:
+  - built `dist/skwish-my-mac-macOS-v0.1.2.zip`
+  - built `dist/skwish-my-mac-macOS-v0.1.2.dmg`
+  - bundle version set to `0.1.2` with `LSUIElement=true`
 
-Last updated: 2026-04-20 17:27:01 WIB
+Last updated: 2026-04-20 18:33:52 WIB

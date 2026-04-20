@@ -36,6 +36,12 @@ swift build
 swift run
 ```
 
+Tip: to temporarily force Dock icon during dev, run:
+
+```bash
+SKWISH_SHOW_DOCK=1 swift run
+```
+
 ## Build distributable .app bundle
 
 skwish-my-mac is a SwiftPM app project. Current executable target name is `SkwishMyMac`, so `swift build` does not auto-generate a `.app` bundle. Use this:
@@ -70,9 +76,11 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<'PLIST'
   <key>CFBundleShortVersionString</key>
   <string>0.1.0</string>
   <key>CFBundleExecutable</key>
-  <string>skwish-my-mac</string>
+  <string>SkwishMyMac</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>LSUIElement</key>
+  <true/>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
 </dict>

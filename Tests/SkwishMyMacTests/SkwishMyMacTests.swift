@@ -55,3 +55,21 @@ import Testing
     let newerVersionState = UpdatePolicy.evaluate(current: "0.1.0", latest: "0.2.1", dismissedVersion: "0.2.0")
     #expect(UpdatePolicy.shouldShowBanner(for: newerVersionState, dismissedVersion: "0.2.0"))
 }
+
+@Test func menu_bar_only_defaults_to_true_when_bundle_flag_missing() {
+    #expect(AppLaunchPolicy.shouldRunMenuBarOnly(infoDictionary: nil, environment: [:]))
+}
+
+@Test func menu_bar_only_follows_lsui_element_bundle_flag() {
+    #expect(AppLaunchPolicy.shouldRunMenuBarOnly(infoDictionary: ["LSUIElement": true], environment: [:]))
+    #expect(AppLaunchPolicy.shouldRunMenuBarOnly(infoDictionary: ["LSUIElement": false], environment: [:]) == false)
+}
+
+@Test func dock_override_environment_disables_menu_bar_only_mode() {
+    #expect(
+        AppLaunchPolicy.shouldRunMenuBarOnly(
+            infoDictionary: ["LSUIElement": true],
+            environment: ["SKWISH_SHOW_DOCK": "1"]
+        ) == false
+    )
+}

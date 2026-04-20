@@ -15,7 +15,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarController: StatusBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let policy = AppLaunchPolicy.activationPolicy(
+            menuBarOnly: AppLaunchPolicy.shouldRunMenuBarOnly(
+                infoDictionary: Bundle.main.infoDictionary,
+                environment: ProcessInfo.processInfo.environment
+            )
+        )
+        _ = NSApplication.shared.setActivationPolicy(policy)
         statusBarController = StatusBarController()
+    }
+}
+
+struct AppLaunchPolicy {
+    static func shouldRunMenuBarOnly(
+        infoDictionary: [String: Any]?,
+        environment: [String: String]
+    ) -> Bool {
+        if environment["SKWISH_SHOW_DOCK"] == "1" {
+            return false
+        }
+
+        if let lsuiElement = infoDictionary?["LSUIElement"] as? Bool {
+            return lsuiElement
+        }
+
+        return true
+    }
+
+    static func activationPolicy(menuBarOnly: Bool) -> NSApplication.ActivationPolicy {
+        menuBarOnly ? .accessory : .regular
     }
 }
 
