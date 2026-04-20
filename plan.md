@@ -256,5 +256,9 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
 - Rebuilt dist artifacts after updater UI implementation:
   - `dist/CleanLocal.app` (~1.0M)
   - `dist/CleanLocal-macOS-v0.1.0.zip` (~264K)
+- Updated README with GitHub-based updater test instructions:
+  - documented top update banner behavior
+  - added exact release-tag flow to test `Check Updates`
+  - clarified that GitHub must have a higher version than the running app
 
-Last updated: 2026-04-20 14:55:10 WIB
+Last updated: 2026-04-20 15:01:34 WIB

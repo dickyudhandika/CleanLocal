@@ -130,11 +130,49 @@ CleanLocal checks:
 Current behavior:
 
 - `Check Updates` triggers GitHub API call
-- if newer tag exists, footer shows `Update v<latest>`
-- clicking `Update v<latest>` opens the release URL in browser
+- if newer tag exists, app shows a visible update banner at the top
+- the banner shows `current` vs `latest` version
+- user can choose `Update Now`, `Later`, or `Check Again`
+- clicking `Update Now` opens the release URL in browser
 - if no newer version, shows `You’re up to date`
 
 Note: this is a release-link updater, not in-app auto-install.
+
+### How to test `Check Updates`
+
+Fastest way:
+
+1. Keep your local app on an older version (example: `0.1.0`).
+2. Create a newer GitHub release tag (example: `v0.1.1`).
+3. Upload any zip asset to that release.
+4. Open CleanLocal and click `Check Updates`.
+5. You should see the update banner at the top with:
+   - current version
+   - latest version
+   - `Update Now`
+   - `Later`
+   - `Check Again`
+
+Example release test flow:
+
+```bash
+cd ~/Documents/CleanLocal
+VERSION="v0.1.1"
+ZIP="dist/CleanLocal-macOS-${VERSION}.zip"
+
+git tag "$VERSION"
+git push origin "$VERSION"
+
+gh release create "$VERSION" "$ZIP" \
+  --repo dickyudhandika/CleanLocal \
+  --title "CleanLocal ${VERSION}" \
+  --notes "Test release for updater UI."
+```
+
+Important:
+- `Check Updates` compares the app bundle version against the latest GitHub release tag.
+- If your local app is already the same version as the latest release, you will only see `You’re up to date`.
+- So to test the banner properly, GitHub must have a higher version than the app you are running.
 
 ## Onboarding reset (for testing)
 
