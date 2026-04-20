@@ -197,3 +197,28 @@ Let users mark apps as "never suggest removing." Stored in a local JSON config.
 - **Safe by default** — caches and trash first, apps require explicit selection
 - **Time-based thresholds** — "not used in X days" is more useful than raw size sorting
 - **Categories matter** — CPU vs Memory vs Disk are different problems, different solutions
+
+---
+
+## Activity Log
+
+### 2026-04-20 (WIB)
+- Rebranded project from MiniGuard to CleanLocal (local folder + GitHub repo)
+- Renamed GitHub repo to `dickyudhandika/CleanLocal` and confirmed it is public
+- Updated local remote URL to `https://github.com/dickyudhandika/CleanLocal.git`
+- Updated README for CleanLocal naming, paths, release commands, and updater endpoint
+- Full codebase rename sweep completed:
+  - `Package.swift` package/product/target renamed to `CleanLocal`
+  - `Sources/MiniGuard.swift` -> `Sources/CleanLocal.swift`
+  - `Tests/MiniGuardTests/...` -> `Tests/CleanLocalTests/...`
+  - internal app types/labels (`MiniGuardApp`, tabs, UI strings) renamed to CleanLocal
+  - config/storage prefixes changed from `miniguard` to `cleanlocal`
+  - updater repo switched to `dickyudhandika/CleanLocal`
+- Updated docs and marketing files (`README.md`, `docs/index.html`, `plan.md`) to CleanLocal branding
+- Rebuilt app after rename and fixed stale module cache issue via reset/clean rebuild
+- Built distributable app bundle locally:
+  - `dist/CleanLocal.app`
+  - `dist/CleanLocal-macOS-v0.1.0.zip`
+- Changes pushed to GitHub (`main`) including rebrand commit (`e489833`)
+
+Last updated: 2026-04-20 09:18:27 WIB
